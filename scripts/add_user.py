@@ -9,7 +9,7 @@ db = client[os.getenv("DB_NAME")]
 
 print("\n===ADD NEW USER ===\n")
 
-user_id = input("User ID Email (Ex. bluck26): ").strip()
+user_id = input("User ID Email (Ex. wchung27): ").strip()
 name = input("Full name: ").strip()
 position = input("Position (Member/Chairman): ").strip() or "Member"
 
