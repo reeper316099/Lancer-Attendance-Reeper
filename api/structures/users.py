@@ -26,16 +26,19 @@ class Users:
         })
         return True
 
-    def update(self, id: str, position: str = None, score: int = None, admin: bool = False):
+    def update(self, id: str, position: str = None, score: int = None, admin: bool | None = None):
         filter = {"id": id}
         document = self.collection.find_one(filter)
 
         if not document:
             return False
 
-        document["position"] = position if position else document["position"]
-        document["score"] = score if score else document["score"]
-        document["admin"] = admin if admin else False
+        if position is not None:
+            document["position"] = position
+        if score is not None:
+            document["score"] = score
+        if admin is not None:
+            document["admin"] = admin
 
         self.collection.replace_one(filter, document)
         return True
@@ -54,7 +57,7 @@ class Users:
         return self.collection.find_one(filter, {"_id": 0})
 
     def get_all(self):
-        return self.collection.find({}, {"_id": 0}).to_list()
+        return list(self.collection.find({}, {"_id": 0}))
 
     def set_score(self, id: str, score: int):
         filter = {"id": id}
