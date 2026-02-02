@@ -20,7 +20,7 @@
             </div>
             <hr>
 
-            <form action="login" method="POST">
+            <form action="{{ url_for('views.login') }}" method="POST">
 
                 <p>Email</p>
                 <input type="text" name="email" id="" class="input" required>

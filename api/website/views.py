@@ -31,6 +31,11 @@ def home():
     return render_template("home.html")
 
 
+@views.route("/manual")
+def manual():
+    return render_template("manual.html")
+
+
 @views.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
