@@ -1,17 +1,10 @@
-import asyncio
 import json
-import os
 from datetime import datetime
-import random
-from crypt import methods
-from threading import Thread
-from flask import Blueprint, render_template, request, jsonify, redirect
+from flask import Blueprint, render_template, request, jsonify, redirect, session
 from functools import wraps
-from flask import redirect, session
 
 from database import Database
 from flask_cors import CORS
-from positions import Positions
 from structures.users import Users
 from structures.cards import Cards
 
@@ -37,6 +30,12 @@ def admin_required(func):
 def home():
     return render_template("home.html")
 
+
+@views.route("/manual")
+def manual():
+    return render_template("manual.html")
+
+
 @views.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
@@ -58,7 +57,7 @@ def login():
 
     return render_template("login.html", error="Invalid credentials")
 
-@views.route("admin/home")
+@views.route("/admin/home")
 @admin_required
 def admin_home():
     return render_template("adminpanel.html")
@@ -70,11 +69,11 @@ def admin_profile(id):
 
 # the api stuff
 
-@views.route("api/get_status", methods=["GET"])
+@views.route("/api/get_status", methods=["GET"])
 def get_status():
     return jsonify({"status": 200})
 
-@views.route("api/create_user", methods=["POST"])
+@views.route("/api/create_user", methods=["POST"])
 def create_user():
     data = request.get_json(silent=True)
 
@@ -91,9 +90,12 @@ def create_user():
     else:
         return jsonify({"status": 409, "response": "User with ID already exists"})
 
-@views.route("api/update_user", methods=["PUT"])
+@views.route("/api/update_user", methods=["PUT"])
 def update_user():
     data = request.get_json(silent=True)
+
+    if not data:
+        return jsonify({"status": 400, "response": "Invalid JSON body"})
 
     id = data.get("id")
     position = data.get("position")
@@ -106,7 +108,7 @@ def update_user():
     else:
         return jsonify({"status": 409, "response": "Unable to update user"})
 
-@views.route("api/delete_user", methods=["DELETE"])
+@views.route("/api/delete_user", methods=["DELETE"])
 def delete_user():
     data = request.get_json(silent=True)
 
@@ -121,42 +123,44 @@ def delete_user():
     else:
         return jsonify({"status": 210, "response": "User does not exist"})
 
-@views.route("api/get_users", methods=["GET"])
+@views.route("/api/get_users", methods=["GET"])
 def get_users():
     return {"status": 200, "response": users.get_all()}
 
-@views.route("api/get_user")
+@views.route("/api/get_user")
 def get_user():
     id = request.args.get("id")
     return {"status": 200, "response": users.get({"id": id})}
 
-@views.route("api/check_in", methods=["POST"])
+@views.route("/api/check_in", methods=["POST"])
 def check_in():
     data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"status": 400, "response": "Invalid JSON body"})
     id = data.get("id")
 
     checked_in = users.check_in(id)
     return jsonify({"status": 200, "response": "Checked in" if checked_in else "Checked out"})
 
-@views.route("api/is_present")
+@views.route("/api/is_present")
 def is_checked_in():
     id = request.args.get("id")
     user = users.get({"id": id})
 
     if not user:
-        return False
+        return jsonify({"status": 404, "response": False})
 
     if not user.get("attendance"):
-        return {"status": 200, "response": False}
+        return jsonify({"status": 200, "response": False})
 
     last_obj = user["attendance"][-1]
     if last_obj["date"] == datetime.now().strftime("%x") and not last_obj["out"]:
-        return {"status": 200, "response": True}
+        return jsonify({"status": 200, "response": True})
 
-    return {"status": 200, "response": False}
+    return jsonify({"status": 200, "response": False})
 
 
-@views.route("api/create_card", methods=["POST"])
+@views.route("/api/create_card", methods=["POST"])
 def create_card():
     data = request.get_json(silent=True)
 
@@ -174,7 +178,7 @@ def create_card():
     else:
         return jsonify({"status": 409, "response": "Something went terribly wrong"})
 
-@views.route("api/update_card", methods=["POST"])
+@views.route("/api/update_card", methods=["POST"])
 def update_card():
     data = request.get_json(silent=True)
 
@@ -184,9 +188,12 @@ def update_card():
     id = data.get("id")
     enabled = data.get("enabled")
 
-    cards.update(id, enabled)
+    updated = cards.update(id, enabled)
+    if updated:
+        return jsonify({"status": 200, "response": "Card updated"})
+    return jsonify({"status": 404, "response": "Card does not exist"})
 
-@views.route("api/delete_card", methods=["DELETE"])
+@views.route("/api/delete_card", methods=["DELETE"])
 def delete_card():
     data = request.get_json(silent=True)
 
@@ -201,16 +208,16 @@ def delete_card():
     else:
         return jsonify({"status": 210, "response": "Card does not exist"})
 
-@views.route("api/get_card")
+@views.route("/api/get_card")
 def get_card():
     id = request.args.get("id")
     return jsonify({"status": 200, "response": cards.get({"id": id})})
 
-@views.route("api/get_cards")
+@views.route("/api/get_cards")
 def get_cards():
     return jsonify({"status": 200, "response": cards.get_all()})
 
-@views.route("api/get_cards_from")
+@views.route("/api/get_cards_from")
 def get_cards_from():
     user_id = request.args.get("user_id")
     return jsonify({"status": 200, "response": cards.get({"user_id": user_id})})

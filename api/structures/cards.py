@@ -35,10 +35,11 @@ class Cards:
         document = self.collection.find_one(filter)
 
         if not document:
-            return
+            return False
 
         document["enabled"] = enabled
         self.collection.replace_one(filter, document)
+        return True
 
     def delete(self, card_id: str):
         filter = {"id": card_id}
@@ -54,4 +55,4 @@ class Cards:
         return list(self.collection.find(filter, {"_id": 0}))
 
     def get_all(self):
-        return self.collection.find({}, {"_id": 0}).to_list()
+        return list(self.collection.find({}, {"_id": 0}))
