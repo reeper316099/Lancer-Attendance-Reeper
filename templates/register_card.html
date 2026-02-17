@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Register RFID Card - RFID Attendance{% endblock %}
+
+{% block body %}
+<div class="admin-container">
+    <nav class="admin-nav">
+        <h1>Register RFID Card</h1>
+        <div class="nav-links">
+            <a href="/admin">Dashboard</a>
+            <a href="/register" class="active">Register Cards</a>
+            <a href="/reports">Reports</a>
+            <a href="/display" target="_blank">Live Display</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+    
+    <div class="admin-content">
+        <div class="registration-container">
+            <div class="registration-card">
+                <h2>Register New RFID Card</h2>
+                <p>Scan an RFID card and enter student information to register</p>
+                
+                <form id="registrationForm">
+                    <div class="form-group">
+                        <label>RFID Card UID:</label>
+                        <div class="rfid-input-group">
+                            <input type="text" id="rfidUid" placeholder="Scan card or enter manually" required>
+                            <button type="button" class="btn-secondary" onclick="scanCard()">📡 Scan Card</button>
+                        </div>
+                        <small>Place card near reader and click "Scan Card"</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Full Name:</label>
+                        <input type="text" id="name" placeholder="John Doe" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Student ID:</label>
+                        <input type="text" id="studentId" placeholder="STU12345" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="email" placeholder="student@school.edu" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Graduating Year:</label>
+                        <input type="number" id="gradYear" placeholder="2026" min="2020" max="2030" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Assigned Task (Optional):</label>
+                        <input type="text" id="task" placeholder="e.g., 3D Printing, Electronics, etc." value="No task assigned">
+                    </div>
+                    
+                    <div class="form-buttons">
+                        <button type="submit" class="btn-primary">Register Card</button>
+                        <button type="button" class="btn-secondary" onclick="resetForm()">Clear Form</button>
+                    </div>
+                </form>
+                
+                <div id="message" class="message"></div>
+            </div>
+            
+            <div class="help-card">
+                <h3>How to Register</h3>
+                <ol>
+                    <li>Click "Scan Card" button</li>
+                    <li>Place RFID card near the reader</li>
+                    <li>Card UID will auto-populate</li>
+                    <li>Fill in student information</li>
+                    <li>Click "Register Card"</li>
+                </ol>
+                
+                <div class="tips">
+                    <h4>Tips</h4>
+                    <ul>
+                        <li>Each card can only be registered once</li>
+                        <li>Student IDs must be unique</li>
+                        <li>Assigned tasks can be edited later</li>
+                        <li>Manual RFID UID entry is allowed for testing</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let scanning = false;
+
+async function scanCard() {
+    if (scanning) {
+        showMessage('Already scanning... please wait', 'warning');
+        return;
+    }
+    
+    scanning = true;
+    const button = event.target;
+    const originalText = button.textContent;
+    button.textContent = '🔄 Scanning...';
+    button.disabled = true;
+    
+    showMessage('Place card near reader now...', 'info');
+    
+    try {
+        // NOTE: This requires the RFID scanner to be accessible
+        // In production, this might need to communicate with the scanner process differently
+        showMessage('⚠️ Manual RFID scan not available via web. Please enter UID manually or use hardware scanner.', 'warning');
+        
+        // For testing without hardware:
+        // const testUid = 'TEST_' + Math.random().toString(36).substr(2, 9);
+        // document.getElementById('rfidUid').value = testUid;
+        // showMessage('Test UID generated: ' + testUid, 'success');
+        
+    } catch (error) {
+        showMessage('Error scanning card: ' + error.message, 'error');
+    } finally {
+        scanning = false;
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        rfid_uid: document.getElementById('rfidUid').value,
+        name: document.getElementById('name').value,
+        student_id: document.getElementById('studentId').value,
+        email: document.getElementById('email').value,
+        graduating_year: parseInt(document.getElementById('gradYear').value),
+        assigned_task: document.getElementById('task').value
+    };
+    
+    try {
+        const response = await fetch('/api/users', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage(`✓ Successfully registered ${data.name}!`, 'success');
+            resetForm();
+        } else {
+            showMessage('✗ Error: ' + result.message, 'error');
+        }
+    } catch (error) {
+        showMessage('✗ Error registering card: ' + error.message, 'error');
+    }
+});
+
+function resetForm() {
+    document.getElementById('registrationForm').reset();
+    document.getElementById('task').value = 'No task assigned';
+    document.getElementById('message').innerHTML = '';
+}
+
+function showMessage(text, type) {
+    const messageDiv = document.getElementById('message');
+    let className = '';
+    
+    switch(type) {
+        case 'success': className = 'message-success'; break;
+        case 'error': className = 'message-error'; break;
+        case 'warning': className = 'message-warning'; break;
+        case 'info': className = 'message-info'; break;
+    }
+    
+    messageDiv.innerHTML = `<div class="${className}">${text}</div>`;
+    
+    // Auto-clear success messages
+    if (type === 'success') {
+        setTimeout(() => {
+            messageDiv.innerHTML = '';
+        }, 5000);
+    }
+}
+</script>
+{% endblock %}

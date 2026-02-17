@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Who's Checked In - RFID Attendance{% endblock %}
+
+{% block body %}
+<div class="display-container">
+    <div class="display-header">
+        <div class="display-logo">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Center for Discovery & Design">
+            <h1>Lab Attendance</h1>
+        </div>
+        <div class="stats">
+            <div class="stat-box">
+                <span class="stat-number" id="currentCount">0</span>
+                <span class="stat-label">Currently In Lab</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-time" id="currentTime">--:--</span>
+                <span class="stat-label">Current Time</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="checkin-grid" id="checkinGrid">
+        <div class="empty-state">
+            <p>No one is currently checked in</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const socket = io();
+let currentCheckins = [];
+
+// Update current time
+function updateTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true
+    });
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// Load current check-ins
+async function loadCheckins() {
+    const response = await fetch('/api/checkin/current');
+    currentCheckins = await response.json();
+    renderCheckins();
+}
+
+// Render check-ins
+function renderCheckins() {
+    const grid = document.getElementById('checkinGrid');
+    document.getElementById('currentCount').textContent = currentCheckins.length;
+    
+    if (currentCheckins.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><p>No one is currently checked in</p></div>';
+        return;
+    }
+    
+    grid.innerHTML = currentCheckins.map(checkin => `
+        <div class="checkin-card">
+            <div class="checkin-name">${checkin.name}</div>
+            <div class="checkin-task">${checkin.assigned_task}</div>
+            <div class="checkin-time">
+                ${formatTime(checkin.check_in_time)}
+                <span class="duration">(${checkin.duration_minutes} min)</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Format time
+function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true
+    });
+}
+
+// WebSocket listeners
+socket.on('checkin_update', () => {
+    loadCheckins();
+});
+
+socket.on('user_updated', () => {
+    loadCheckins();
+});
+
+socket.on('user_deleted', () => {
+    loadCheckins();
+});
+
+socket.on('auto_checkout', () => {
+    loadCheckins();
+});
+
+// Auto-refresh every 10 seconds
+setInterval(loadCheckins, 10000);
+
+// Initial load
+loadCheckins();
+</script>
+{% endblock %}

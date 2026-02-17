@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Setup - RFID Attendance{% endblock %}
+
+{% block body %}
+<div class="setup-container">
+    <div class="setup-box">
+        <h1>Initial Admin Setup</h1>
+        <p>Create two admin accounts for the system</p>
+        
+        <form id="setupForm">
+            <div class="admin-section">
+                <h3>Admin Account 1 (Student)</h3>
+                <input type="text" id="username1" placeholder="Username" required>
+                <input type="password" id="password1" placeholder="Password" required>
+                <input type="text" id="fullname1" placeholder="Full Name" required>
+            </div>
+            
+            <div class="admin-section">
+                <h3>Admin Account 2 (Teacher)</h3>
+                <input type="text" id="username2" placeholder="Username" required>
+                <input type="password" id="password2" placeholder="Password" required>
+                <input type="text" id="fullname2" placeholder="Full Name" required>
+            </div>
+            
+            <button type="submit" class="btn-primary">Create Admin Accounts</button>
+        </form>
+        
+        <div id="message" class="message"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('setupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        username1: document.getElementById('username1').value,
+        password1: document.getElementById('password1').value,
+        fullname1: document.getElementById('fullname1').value,
+        username2: document.getElementById('username2').value,
+        password2: document.getElementById('password2').value,
+        fullname2: document.getElementById('fullname2').value
+    };
+    
+    const response = await fetch('/setup-admin', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+        document.getElementById('message').innerHTML = '<div class="success">✓ Admin accounts created! Redirecting to login...</div>';
+        setTimeout(() => window.location.href = '/login', 2000);
+    } else {
+        document.getElementById('message').innerHTML = '<div class="error">✗ Error creating accounts</div>';
+    }
+});
+</script>
+{% endblock %}

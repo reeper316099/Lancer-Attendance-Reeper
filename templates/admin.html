@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - RFID Attendance{% endblock %}
+
+{% block body %}
+<div class="admin-container">
+    <nav class="admin-nav">
+        <h1>Admin Panel</h1>
+        <div class="nav-links">
+            <a href="/admin" class="active">Dashboard</a>
+            <a href="/register">Register Cards</a>
+            <a href="/reports">Reports</a>
+            <a href="/display" target="_blank">Live Display</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+    
+    <div class="admin-content">
+        <!-- Stats Section -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Currently Checked In</h3>
+                <div class="stat-value" id="currentlyIn">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Users</h3>
+                <div class="stat-value" id="totalUsers">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Today's Visits</h3>
+                <div class="stat-value" id="todayVisits">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Max Occupancy</h3>
+                <div class="stat-value" id="maxOccupancy">30</div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="section">
+            <h2>Quick Actions</h2>
+            <div class="action-buttons">
+                <button class="btn-primary" onclick="location.href='/register'">Register New Card</button>
+                <button class="btn-secondary" onclick="triggerAutoCheckout()">Auto-Checkout All</button>
+                <button class="btn-secondary" onclick="showSettings()">Settings</button>
+            </div>
+        </div>
+        
+        <!-- Currently Checked In -->
+        <div class="section">
+            <h2>Currently Checked In</h2>
+            <div class="table-container">
+                <table id="checkedInTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Student ID</th>
+                            <th>Task</th>
+                            <th>Check-in Time</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="checkedInBody">
+                        <tr><td colspan="6" class="empty">No one checked in</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- All Users -->
+        <div class="section">
+            <h2>All Registered Users</h2>
+            <div class="table-controls">
+                <input type="text" id="searchUsers" placeholder="Search users...">
+            </div>
+            <div class="table-container">
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Student ID</th>
+                            <th>Email</th>
+                            <th>Grad Year</th>
+                            <th>Task</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditModal()">&times;</span>
+        <h2>Edit User</h2>
+        <form id="editForm">
+            <input type="hidden" id="editUserId">
+            <label>Name:</label>
+            <input type="text" id="editName" required>
+            <label>Student ID:</label>
+            <input type="text" id="editStudentId" required>
+            <label>Email:</label>
+            <input type="email" id="editEmail" required>
+            <label>Graduating Year:</label>
+            <input type="number" id="editGradYear" required>
+            <label>Assigned Task:</label>
+            <input type="text" id="editTask">
+            <div class="modal-buttons">
+                <button type="submit" class="btn-primary">Save Changes</button>
+                <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeSettings()">&times;</span>
+        <h2>System Settings</h2>
+        <form id="settingsForm">
+            <label>Max Occupancy:</label>
+            <input type="number" id="settingMaxOccupancy" min="1" max="999">
+            
+            <label>Auto-Checkout Time:</label>
+            <input type="time" id="settingCheckoutTime">
+            
+            <label>
+                <input type="checkbox" id="settingAutoCheckoutEnabled">
+                Enable Auto-Checkout
+            </label>
+            
+            <div class="modal-buttons">
+                <button type="submit" class="btn-primary">Save Settings</button>
+                <button type="button" class="btn-secondary" onclick="closeSettings()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let allUsers = [];
+let currentCheckins = [];
+
+// Load all data
+async function loadData() {
+    await Promise.all([
+        loadUsers(),
+        loadCurrentCheckins(),
+        loadSettings(),
+        loadTodayStats()
+    ]);
+}
+
+async function loadUsers() {
+    const response = await fetch('/api/users');
+    allUsers = await response.json();
+    document.getElementById('totalUsers').textContent = allUsers.length;
+    renderUsers();
+}
+
+async function loadCurrentCheckins() {
+    const response = await fetch('/api/checkin/current');
+    currentCheckins = await response.json();
+    document.getElementById('currentlyIn').textContent = currentCheckins.length;
+    renderCurrentCheckins();
+}
+
+async function loadSettings() {
+    const response = await fetch('/api/settings');
+    const settings = await response.json();
+    document.getElementById('maxOccupancy').textContent = settings.max_occupancy;
+}
+
+async function loadTodayStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const response = await fetch(`/api/reports/daily?date=${today}`);
+    const data = await response.json();
+    document.getElementById('todayVisits').textContent = data.total_visits;
+}
+
+function renderCurrentCheckins() {
+    const tbody = document.getElementById('checkedInBody');
+    
+    if (currentCheckins.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No one checked in</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = currentCheckins.map(c => `
+        <tr>
+            <td>${c.name}</td>
+            <td>${c.student_id}</td>
+            <td>${c.assigned_task}</td>
+            <td>${formatTime(c.check_in_time)}</td>
+            <td>${c.duration_minutes} min</td>
+            <td>
+                <button class="btn-small btn-danger" onclick="manualCheckout(${c.id})">Check Out</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderUsers() {
+    const tbody = document.getElementById('usersBody');
+    const searchTerm = document.getElementById('searchUsers').value.toLowerCase();
+    
+    const filtered = allUsers.filter(u => 
+        u.name.toLowerCase().includes(searchTerm) ||
+        u.student_id.toLowerCase().includes(searchTerm) ||
+        u.email.toLowerCase().includes(searchTerm)
+    );
+    
+    tbody.innerHTML = filtered.map(u => {
+        const isCheckedIn = currentCheckins.some(c => c.id === u.id);
+        return `
+            <tr>
+                <td>${u.name}</td>
+                <td>${u.student_id}</td>
+                <td>${u.email}</td>
+                <td>${u.graduating_year}</td>
+                <td>${u.assigned_task}</td>
+                <td><span class="status-badge ${isCheckedIn ? 'status-in' : 'status-out'}">${isCheckedIn ? 'Checked In' : 'Checked Out'}</span></td>
+                <td>
+                    ${!isCheckedIn ? `<button class="btn-small" onclick="manualCheckin(${u.id})">Check In</button>` : ''}
+                    <button class="btn-small" onclick="editUser(${u.id})">Edit</button>
+                    <button class="btn-small btn-danger" onclick="deleteUser(${u.id}, '${u.name}')">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function manualCheckin(userId) {
+    const response = await fetch('/api/checkin/manual', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user_id: userId, action: 'checkin'})
+    });
+    
+    if (response.ok) {
+        await loadData();
+    }
+}
+
+async function manualCheckout(userId) {
+    const response = await fetch('/api/checkin/manual', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user_id: userId, action: 'checkout'})
+    });
+    
+    if (response.ok) {
+        await loadData();
+    }
+}
+
+function editUser(userId) {
+    const user = allUsers.find(u => u.id === userId);
+    document.getElementById('editUserId').value = user.id;
+    document.getElementById('editName').value = user.name;
+    document.getElementById('editStudentId').value = user.student_id;
+    document.getElementById('editEmail').value = user.email;
+    document.getElementById('editGradYear').value = user.graduating_year;
+    document.getElementById('editTask').value = user.assigned_task;
+    document.getElementById('editModal').style.display = 'block';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+document.getElementById('editForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const userId = document.getElementById('editUserId').value;
+    
+    const data = {
+        name: document.getElementById('editName').value,
+        student_id: document.getElementById('editStudentId').value,
+        email: document.getElementById('editEmail').value,
+        graduating_year: document.getElementById('editGradYear').value,
+        assigned_task: document.getElementById('editTask').value
+    };
+    
+    const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+        closeEditModal();
+        await loadData();
+    }
+});
+
+async function deleteUser(userId, name) {
+    if (!confirm(`Are you sure you want to delete ${name}? This will also delete all their check-in records.`)) {
+        return;
+    }
+    
+    const response = await fetch(`/api/users/${userId}`, {method: 'DELETE'});
+    if (response.ok) {
+        await loadData();
+    }
+}
+
+async function triggerAutoCheckout() {
+    if (!confirm('Check out all currently checked-in users?')) return;
+    
+    const response = await fetch('/api/auto-checkout', {method: 'POST'});
+    const result = await response.json();
+    alert(`${result.count} users checked out`);
+    await loadData();
+}
+
+async function showSettings() {
+    const response = await fetch('/api/settings');
+    const settings = await response.json();
+    
+    document.getElementById('settingMaxOccupancy').value = settings.max_occupancy;
+    document.getElementById('settingCheckoutTime').value = settings.auto_checkout_time;
+    document.getElementById('settingAutoCheckoutEnabled').checked = settings.auto_checkout_enabled === '1';
+    document.getElementById('settingsModal').style.display = 'block';
+}
+
+function closeSettings() {
+    document.getElementById('settingsModal').style.display = 'none';
+}
+
+document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        max_occupancy: parseInt(document.getElementById('settingMaxOccupancy').value),
+        auto_checkout_time: document.getElementById('settingCheckoutTime').value,
+        auto_checkout_enabled: document.getElementById('settingAutoCheckoutEnabled').checked
+    };
+    
+    const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+        closeSettings();
+        await loadData();
+    }
+});
+
+document.getElementById('searchUsers').addEventListener('input', renderUsers);
+
+function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'});
+}
+
+// Auto-refresh
+setInterval(loadData, 10000);
+
+// Initial load
+loadData();
+</script>
+{% endblock %}
